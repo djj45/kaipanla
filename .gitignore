@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# OS
+.DS_Store
+
+# 项目数据（逆向产物，不公开）
+data/
+docs/
+tools/
+HANDOVER.md
+kpl_socket.py
+main.py
