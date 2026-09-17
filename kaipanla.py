@@ -614,18 +614,24 @@ class KaipanlaCrawler:
 
         Returns:
             dict:
-                - limit_up: 涨停家数
-                - limit_down: 跌停家数
+                - limit_up: 涨停家数（不含 ST）
+                - limit_down: 跌停家数（不含 ST）
                 - up_count: 上涨家数
                 - down_count: 下跌家数
                 - flat_count: 平盘家数（PPJS，真实值）
                 - total: 总家数 = 涨 + 跌 + 平
-                - broken_rate: 今日破板率(%)（tFengBan）
+                - seal_rate: 今日封板率(%)（tFengBan）
+                - break_rate: 今日破板率(%)（炸板率 = 100 − tFengBan，
+                  与 app 展示及历史接口 ZBL 完全一致，2026-09-16/17 两天互验）
+                - yest_seal_rate: 昨日封板率(%)（lFengBan）
                 - yest_limit_up_rise: 昨日涨停表现(%)（ZRZTJ）
                 - yest_lianban_rise: 昨日连板表现(%)（ZRLBJ）
                 - strength: 涨跌强度（ZHQD）
 
-        实测（2026-09-17 收盘）：涨 2576 + 跌 2820 + 平 157 = 5553
+        实测（2026-09-17 收盘）：涨 2576 + 跌 2820 + 平 157 = 5553；
+        涨停 47 / 跌停 1 不含 ST（历史接口同日含 ST 为 49 / 2）。
+        封板率 tFengBan=70.1493 = 47/(47+20 触板)；
+        破板率 = 29.8507，与历史接口 ZBL 及 app 展示一致。
         """
         params = {
             "c": "Index", "a": "GetInfo",
@@ -650,8 +656,12 @@ class KaipanlaCrawler:
             "down_count": down,
             "flat_count": flat,
             "total": up + down + flat,
-            # 下面几个字段随 apiv 一起返回，顺手透出
-            "broken_rate": db.get("tFengBan"),
+            # tFengBan/lFengBan 实为「封板率」而非破板率：
+            # 09-17 实测 70.1493 = 47/(47+20)，破板率 = 100 − 封板率 = 29.8507，
+            # 与历史接口 ZBL 及 app 展示的「破板率」完全一致
+            "seal_rate": db.get("tFengBan"),
+            "break_rate": round(100 - db["tFengBan"], 4) if isinstance(db.get("tFengBan"), (int, float)) else None,
+            "yest_seal_rate": db.get("lFengBan"),
             "yest_limit_up_rise": db.get("ZRZTJ"),
             "yest_lianban_rise": db.get("ZRLBJ"),
             "strength": db.get("ZHQD"),
@@ -669,11 +679,14 @@ class KaipanlaCrawler:
 
         Returns:
             DataFrame: [date, up_count, down_count, flat_count,
-                        limit_up, limit_down, broken_rate, yest_rise]
+                        limit_up, limit_down, break_rate, yest_rise]
 
         注意：
             - flat_count（平盘家数）没有历史值，恒为 NaN。
               平盘家数只有实时接口 get_market_sentiment() 才提供。
+            - limit_up / limit_down / ZT / DT 含 ST，比实时接口（不含 ST）略多：
+              2026-09-17 实测 历史 49/2 vs 实时 47/1。
+            - break_rate 即破板率/炸板率（ZBL），与 app 展示一致。
             - 周末直接跳过；法定节假日请求会返回空数据并被自动剔除。
         """
         if start and end:
@@ -707,12 +720,12 @@ class KaipanlaCrawler:
                 "flat_count": float("nan"),  # 接口不提供历史平盘家数
                 "limit_up": nums.get("ZT"),
                 "limit_down": nums.get("DT"),
-                "broken_rate": nums.get("ZBL"),
+                "break_rate": nums.get("ZBL"),
                 "yest_rise": nums.get("yestRase"),
             })
 
         cols = ["date", "up_count", "down_count", "flat_count",
-                "limit_up", "limit_down", "broken_rate", "yest_rise"]
+                "limit_up", "limit_down", "break_rate", "yest_rise"]
         if not rows:
             return pd.DataFrame(columns=cols)
         return pd.DataFrame(rows, columns=cols)
@@ -826,7 +839,7 @@ if __name__ == "__main__":
     print(f"  涨停: {s['limit_up']}    跌停: {s['limit_down']}")
     print(f"  上涨: {s['up_count']}  下跌: {s['down_count']}  平盘: {s['flat_count']}")
     print(f"  总计: {s['total']}  (涨+跌+平)")
-    print(f"  破板率: {s['broken_rate']}%   涨跌强度: {s['strength']}")
+    print(f"  破板率: {s['break_rate']}%   封板率: {s['seal_rate']}%   涨跌强度: {s['strength']}")
 
     print("\n" + "=" * 60)
     print("历史涨跌家数测试")

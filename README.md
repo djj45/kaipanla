@@ -177,18 +177,23 @@ df = crawler.get_market_sentiment_history(start="2026-01-01", end="2026-09-16")
 
 | 字段 | 含义 |
 |---|---|
-| limit_up | 涨停家数 |
-| limit_down | 跌停家数 |
+| limit_up | 涨停家数（不含 ST） |
+| limit_down | 跌停家数（不含 ST） |
 | up_count | 上涨家数 |
 | down_count | 下跌家数 |
 | flat_count | 平盘家数（来自 PPJS，真实值） |
 | total | 总家数 = 涨 + 跌 + 平 |
-| broken_rate | 今日破板率(%) |
+| seal_rate | 今日封板率(%)（tFengBan） |
+| break_rate | 今日破板率(%)（炸板率 = 100 − tFengBan，与 app 展示及历史 ZBL 一致） |
+| yest_seal_rate | 昨日封板率(%)（lFengBan） |
 | yest_limit_up_rise | 昨日涨停表现(%) |
 | yest_lianban_rise | 昨日连板表现(%) |
 | strength | 涨跌强度 |
 
-实测（2026-09-17 收盘）：涨 2576 + 跌 2820 + 平 157 = 5553。
+实测（2026-09-17 收盘）：涨 2576 + 跌 2820 + 平 157 = 5553；
+涨停 47 / 跌停 1 **不含 ST**（历史接口同日含 ST 为 49 / 2）；
+封板率 70.15%（47 涨停 / 67 触板），破板率 29.85%，
+与 app 展示（09-16 = 11%、09-17 = 29.85%）及历史接口 ZBL 完全一致。
 
 ### get_market_sentiment_history(start=None, end=None, count=30)
 
@@ -210,13 +215,14 @@ df = crawler.get_market_sentiment_history(start="2026-01-01", end="2026-09-16")
 | up_count | 上涨家数 |
 | down_count | 下跌家数 |
 | flat_count | 平盘家数，恒为 NaN（接口不提供历史平盘家数） |
-| limit_up | 涨停家数 |
-| limit_down | 跌停家数 |
-| broken_rate | 破板率(%) |
+| limit_up | 涨停家数（含 ST，比实时接口略多） |
+| limit_down | 跌停家数（含 ST，比实时接口略多） |
+| break_rate | 破板率(%)（ZBL，炸板率，与 app 展示一致） |
 | yest_rise | 昨日涨停表现(%) |
 
 - 周末会被跳过；法定节假日请求返回空数据并被自动剔除
 - 平盘家数只有实时接口 get_market_sentiment() 才提供
+- 涨停/跌停口径与实时接口不同：历史含 ST（2026-09-17 实测 历史 49/2 vs 实时 47/1）
 
 ## 支持的代码
 
